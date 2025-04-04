@@ -1,0 +1,11 @@
+python_dotenv
+langchain
+streamlit
+langchain-groq
+Faiss-cpu
+langchain-community
+langchain-huggingface
+pymupdf
+unstructured
+sentence-transformers
+ -e .
