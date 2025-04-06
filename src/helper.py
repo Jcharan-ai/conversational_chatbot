@@ -5,16 +5,14 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from src.logger import logger
+import streamlit as st
 
 def load_env():
     """Load environment variables from .env file."""
  
     load_dotenv()
-    os.environ["HUGGINGFACEHUB_API_TOKENI_KEY"] = os.getenv("HF_API_KEY")
-    #os.environ["GROQ_KEY"] = os.getenv("GROQ_KEY")
-    os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
-    os.environ["LANGSMITH_PROJECT"] = os.getenv("LANGSMITH_PROJECT")
-    os.environ["LANGSMITH_TRACING"] = os.getenv("LANGSMITH_TRACING")
+    os.environ["HF_API_KEY"] = st.secrets["HF_API_KEY"]
+    
     
 def create_documents(docs):
     """Create documents from uploaded files."""

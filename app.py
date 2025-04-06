@@ -44,84 +44,89 @@ if api_key:
     uploaded_file = st.file_uploader("Upload a file", type=["txt", "pdf", "docx"], accept_multiple_files=True)
     
     #create docs
-    docs=create_documents(uploaded_file)
-    logger.info(f"Documents created: {len(docs)}")
+    if uploaded_file:
+        docs=create_documents(uploaded_file)
+        logger.info(f"Documents created: {len(docs)}")
     
-    # Create embeddings
-    vectorstore = create_embeddings(docs)
-    logger.info("Embeddings created successfully.")
+        vectorstore = create_embeddings(docs)
+        logger.info("Embeddings created successfully.")
     
-    retriver=vectorstore.as_retriever()
-    logger.info("Retriever created successfully.")
+
         
-    contextualized_q_promt = ChatPromptTemplate.from_messages(
-        [
-            ("system", contextulized_q_system_prompt),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-        ]
-    )
-    
-    history_aware_retriver = create_history_aware_retriever(llm,retriver, contextualized_q_promt)
-    logger.info("History aware retriever created successfully.")
-    
-    qa_prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-        ]
-    )
-    
-    qa_chain = create_stuff_documents_chain(llm, qa_prompt)
-    logger.info("QA chain created successfully.")
-    
-    rag_chain = create_retrieval_chain(history_aware_retriver, qa_chain)
-    logger.info("Retrieval chain created successfully.")
-     
-    session_id=st.text_input("Enter a session ID:", value=generate_session_id(), key="session_id")
-    if not session_id:
-        st.warning("Please enter a session ID to continue.")
+        retriver=vectorstore.as_retriever()
+        logger.info("Retriever created successfully.")
         
-   
-    store = {}
+            
+        contextualized_q_promt = ChatPromptTemplate.from_messages(
+            [
+                ("system", contextulized_q_system_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human", "{input}"),
+            ]
+        )
+        
+        history_aware_retriver = create_history_aware_retriever(llm,retriver, contextualized_q_promt)
+        logger.info("History aware retriever created successfully.")
+        
+        qa_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human", "{input}"),
+            ]
+        )
+        
+        qa_chain = create_stuff_documents_chain(llm, qa_prompt)
+        logger.info("QA chain created successfully.")
+        
+        rag_chain = create_retrieval_chain(history_aware_retriver, qa_chain)
+        logger.info("Retrieval chain created successfully.")
+        
+        session_id=st.text_input("Enter a session ID:", value=generate_session_id(), key="session_id")
+        if not session_id:
+            st.warning("Please enter a session ID to continue.")
+            
+    
+        store = {}
 
 
-    def get_session_history(session_id: str) -> BaseChatMessageHistory:
-        if session_id not in st.session_state.store:
-            st.session_state.store[session_id] = ChatMessageHistory()
-        return st.session_state.store[session_id]
+        def get_session_history(session_id: str) -> BaseChatMessageHistory:
+            if session_id not in st.session_state.store:
+                st.session_state.store[session_id] = ChatMessageHistory()
+            return st.session_state.store[session_id]
+        
+        
+        conversational_rag_chain = RunnableWithMessageHistory(
+            rag_chain,
+            get_session_history,
+            input_messages_key="input",
+            history_messages_key="chat_history",
+            output_messages_key="answer",
+        )
+        user_input = st.text_input("Ask a question from the uploaded documents:")
+        if user_input:
+            session_history = get_session_history(session_id)
+            with st.spinner("Generating response..."):
+                try:
+                    result = conversational_rag_chain.invoke(
+                        {"input": user_input},
+                        config={
+                            "configurable": {"session_id": session_id}
+                        }
+                    
+                    )
+                    
+                    st.write(st.session_state.store)
+                    st.write(result["answer"])
+                    st.write("Chat History:", session_history.messages)
+                    
+                except Exception as e:
+                    logger.error(f"Error occurred: {e}")
+                    st.error("An error occurred while generating the response.")
     
-     
-    conversational_rag_chain = RunnableWithMessageHistory(
-        rag_chain,
-        get_session_history,
-        input_messages_key="input",
-        history_messages_key="chat_history",
-        output_messages_key="answer",
-    )
-    
-    user_input = st.text_input("Ask a question:")
-    if user_input:
-        session_history = get_session_history(session_id)
-        with st.spinner("Generating response..."):
-            try:
-                result = conversational_rag_chain.invoke(
-                    {"input": user_input},
-                    config={
-                        "configurable": {"session_id": session_id}
-                    }
-                
-                )
-                 
-                st.write(st.session_state.store)
-                st.write(result["answer"])
-                st.write("Chat History:", session_history.messages)
-                
-            except Exception as e:
-                logger.error(f"Error occurred: {e}")
-                st.error("An error occurred while generating the response.")
-    
-    
+    else:
+        docs = []
+        logger.warning("No file uploaded. Documents list is empty.")
+ 
 else:
     st.warning("Please enter your API key to continue.")
